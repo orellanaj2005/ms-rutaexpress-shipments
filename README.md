@@ -228,3 +228,20 @@ Se validó el servicio contra una base Oracle real corriendo en Docker (ver
 máquina ya tenía una instalación nativa de Oracle XE ocupando ese puerto), por lo que se agregó
 un `.env` local con `ORACLE_PORT=1522` para poder correr las migraciones de Flyway y validar la
 tabla `SHIPMENTS`.
+
+### 2026-09-12 - Dos bugs encontrados y corregidos probando contra Oracle real (Jassack)
+Al levantar el servicio contra la base de Docker y probar los endpoints con un JWT real de
+Postman aparecieron dos problemas que los tests con H2 no detectaban:
+
+1. **Exchange RabbitMQ desactualizado**: `application.yaml` seguía con `messaging.rabbitmq.exchange:
+   rutaexpress.cmd`, el nombre viejo de antes de la corrección de topología. Solo se había
+   corregido el bean Java (`RabbitConfig`), no el valor de la propiedad. Se cambió a `cmd.direct`.
+2. **ORA-18716 al leer envíos**: `GET /api/shipments` devolvía 500 con `ORA-18716: {0} no está
+   en ninguna zona horaria`. La causa es un problema de compatibilidad entre `ojdbc11` y el tipo
+   JDBC que Hibernate 7 usa por defecto para campos `Instant` (llama a
+   `ResultSet.getObject(col, OffsetDateTime.class)`, que el driver de Oracle no soporta bien
+   contra una columna `TIMESTAMP` plana). No se resolvió cambiando la zona horaria de la JVM ni
+   con la propiedad `oracle.jdbc.timezoneAsRegion` - el fix fue forzar a Hibernate a usar el tipo
+   JDBC `TIMESTAMP` clásico (`getTimestamp()`) para `createdAt`/`updatedAt` vía
+   `@JdbcTypeCode(SqlTypes.TIMESTAMP)`, sin cambiar el tipo Java `Instant` que ya usa el resto del
+   código. Mismo bug y mismo fix en `ms-rutaexpress-catalog`.

@@ -48,4 +48,4 @@ messaging:
   kafka:
     topic-events: shipments.events
   rabbitmq:
-    exchange: rutaexpress.cmd
+    exchange: cmd.direct

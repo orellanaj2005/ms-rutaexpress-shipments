@@ -1,6 +1,8 @@
 package cl.rutaexpress.shipments.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -42,9 +44,17 @@ public class Shipment {
     @Column(name = "status", nullable = false, length = 20)
     private ShipmentStatus status = ShipmentStatus.CREADO;
 
+    // ojdbc11 throws ORA-18716 when Hibernate 7's default JDBC type for
+    // Instant (TimestampUtcAsOffsetDateTimeJdbcType) calls
+    // getObject(col, OffsetDateTime.class) against a plain TIMESTAMP column.
+    // Forcing the classic TIMESTAMP JDBC type keeps Instant as the Java type
+    // but reads/writes via getTimestamp()/setTimestamp() instead, avoiding
+    // the buggy driver code path.
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
