@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:shipments;DB_CLOSE_DELAY=-1;MODE=Oracle
+    username: sa
+    password: sa
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092
+  rabbitmq:
+    host: localhost
+    port: 5672
+
+security:
+  jwt:
+    # This is Microsoft's well-known "consumers" tenant canonical GUID. Using the
+    # canonical form (rather than the "consumers" alias) makes the OIDC discovery
+    # document's "issuer" field match the requested issuer exactly, so the
+    # context-load test doesn't need a real project-specific tenant.
+    issuer-uri: https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0
+    audience: test-audience
+
+services:
+  catalog-url: http://localhost:8082
+
+internal:
+  api-key: dev-internal-key

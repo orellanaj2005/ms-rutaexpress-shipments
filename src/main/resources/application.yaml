@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: shipments
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:oracle:thin:@//${ORACLE_HOST:localhost}:${ORACLE_PORT:1521}/${ORACLE_SERVICE:XEPDB1}
+    username: ${ORACLE_USER:rutaexpress}
+    password: ${ORACLE_PASSWORD:rutaexpress}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.233.170.20:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:100.62.195.17}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8081
+
+security:
+  jwt:
+    issuer-uri: https://login.microsoftonline.com/${TENANT_ID}/v2.0
+    audience: ${API_CLIENT_ID}
+
+services:
+  catalog-url: ${CATALOG_URL:http://catalog-svc:8082}
+
+internal:
+  api-key: ${INTERNAL_API_KEY:dev-internal-key}
+
+messaging:
+  kafka:
+    topic-events: shipments.events
+  rabbitmq:
+    exchange: rutaexpress.cmd
