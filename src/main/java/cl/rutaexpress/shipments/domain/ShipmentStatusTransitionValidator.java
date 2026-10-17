@@ -36,4 +36,9 @@ public final class ShipmentStatusTransitionValidator {
         }
         return ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(target);
     }
+
+    /** Estados a los que se puede pasar desde {@code current}; vacío si es un estado final. */
+    public static Set<ShipmentStatus> allowedFrom(ShipmentStatus current) {
+        return ALLOWED_TRANSITIONS.getOrDefault(current, Set.of());
+    }
 }

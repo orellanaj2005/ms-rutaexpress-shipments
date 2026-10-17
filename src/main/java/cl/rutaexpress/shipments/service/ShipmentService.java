@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ShipmentService {
@@ -88,8 +90,12 @@ public class ShipmentService {
         ShipmentStatus previousStatus = shipment.getStatus();
 
         if (!ShipmentStatusTransitionValidator.isValidTransition(previousStatus, newStatus)) {
-            throw new InvalidStatusTransitionException(
-                    "Cannot transition shipment " + id + " from " + previousStatus + " to " + newStatus);
+            Set<ShipmentStatus> allowed = ShipmentStatusTransitionValidator.allowedFrom(previousStatus);
+            throw new InvalidStatusTransitionException(allowed.isEmpty()
+                    ? "El envío " + id + " está " + previousStatus + ", que es un estado final: ya no admite cambios."
+                    : "No se puede cambiar el envío " + id + " de " + previousStatus + " a " + newStatus
+                            + ". Desde " + previousStatus + " solo se permite pasar a: "
+                            + allowed.stream().map(Enum::name).collect(Collectors.joining(", ")) + ".");
         }
 
         if (newStatus == ShipmentStatus.ACEPTADO) {

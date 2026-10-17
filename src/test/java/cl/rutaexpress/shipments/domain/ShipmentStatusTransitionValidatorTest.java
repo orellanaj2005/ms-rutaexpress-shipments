@@ -60,4 +60,11 @@ class ShipmentStatusTransitionValidatorTest {
         assertThat(ShipmentStatusTransitionValidator.isValidTransition(null, ShipmentStatus.ACEPTADO)).isFalse();
         assertThat(ShipmentStatusTransitionValidator.isValidTransition(ShipmentStatus.CREADO, null)).isFalse();
     }
+
+    @Test
+    void allowedFromListsNextStatesAndIsEmptyForFinalStates() {
+        assertThat(ShipmentStatusTransitionValidator.allowedFrom(ShipmentStatus.EN_BODEGA))
+                .containsExactly(ShipmentStatus.EN_RUTA, ShipmentStatus.CANCELADO);
+        assertThat(ShipmentStatusTransitionValidator.allowedFrom(ShipmentStatus.ENTREGADO)).isEmpty();
+    }
 }

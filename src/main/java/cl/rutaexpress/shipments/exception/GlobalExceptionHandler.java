@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(fieldError ->
                 fields.put(fieldError.getField(), fieldError.getDefaultMessage()));
         return ResponseEntity.badRequest()
-                .body(new ErrorResponse("VALIDATION_ERROR", "Request validation failed", fields));
+                .body(new ErrorResponse("VALIDATION_ERROR", "Hay datos del envío que no son válidos.", fields));
     }
 
     @ExceptionHandler(ShipmentNotFoundException.class)
@@ -50,6 +50,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ErrorResponse> handleConcurrentUpdate(OptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("CONCURRENT_UPDATE", "Shipment was modified concurrently, please retry"));
+                .body(new ErrorResponse("CONCURRENT_UPDATE", "Otro usuario modificó este envío al mismo tiempo. Recarga e inténtalo de nuevo."));
     }
 }

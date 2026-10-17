@@ -47,25 +47,25 @@ public class CatalogClient {
                     .onStatus(HttpStatusCode::is4xxClientError, (request, response) -> {
                         if (response.getStatusCode().value() == 409) {
                             throw new CapacityExceededException(
-                                    "No capacity available for service " + serviceId);
+                                    "El servicio de envío " + serviceId + " no tiene capacidad disponible.");
                         }
                         if (response.getStatusCode().value() == 404) {
                             throw new CapacityExceededException(
-                                    "Catalog service not found: " + serviceId);
+                                    "No existe el servicio de envío " + serviceId + " en el catálogo.");
                         }
                         throw new UpstreamServiceException(
-                                "Catalog returned client error: " + response.getStatusCode());
+                                "El catálogo rechazó la solicitud (" + response.getStatusCode() + ").");
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (request, response) -> {
                         throw new UpstreamServiceException(
-                                "Catalog returned server error: " + response.getStatusCode());
+                                "El catálogo respondió con un error (" + response.getStatusCode() + ").");
                     })
                     .toBodilessEntity();
         } catch (CapacityExceededException | UpstreamServiceException e) {
             throw e;
         } catch (RestClientException e) {
             log.error("Failed to call Catalog service for serviceId={}", serviceId, e);
-            throw new UpstreamServiceException("Catalog service unreachable", e);
+            throw new UpstreamServiceException("El servicio de catálogo no responde.", e);
         }
     }
 }

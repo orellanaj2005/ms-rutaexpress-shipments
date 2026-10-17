@@ -63,7 +63,7 @@ public class ShipmentController {
         try {
             return ShipmentStatus.valueOf(raw);
         } catch (IllegalArgumentException e) {
-            throw new InvalidStatusTransitionException("Unknown status: " + raw);
+            throw new InvalidStatusTransitionException("Estado desconocido: " + raw + ".");
         }
     }
 }
