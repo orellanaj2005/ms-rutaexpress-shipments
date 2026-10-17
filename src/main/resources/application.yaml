@@ -19,16 +19,21 @@ spring:
     enabled: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.233.170.20:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
   rabbitmq:
-    host: ${RABBITMQ_HOST:100.62.195.17}
-    port: ${RABBITMQ_PORT:5672}
+    # Lista de nodos del clúster: si el primero no responde, Spring se conecta al siguiente.
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # Confirmación de publicación: el broker avisa si rechaza un mensaje o si no lo puede enrutar.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 server:
   port: 8081
@@ -47,5 +52,15 @@ internal:
 messaging:
   kafka:
     topic-events: shipments.events
+
+# Contrato de topología RabbitMQ: shipments solo publica, así que usa el exchange y las routing keys.
+rutaexpress:
   rabbitmq:
-    exchange: cmd.direct
+    exchanges:
+      direct: cmd.direct
+    email:
+      routing-key: email.send
+    warehouse:
+      routing-key: warehouse.ticket
+    label:
+      routing-key: label.gen

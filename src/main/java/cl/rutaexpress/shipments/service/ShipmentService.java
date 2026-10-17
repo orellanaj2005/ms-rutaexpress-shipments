@@ -7,7 +7,8 @@ import cl.rutaexpress.shipments.domain.ShipmentStatusTransitionValidator;
 import cl.rutaexpress.shipments.dto.CreateShipmentRequest;
 import cl.rutaexpress.shipments.exception.InvalidStatusTransitionException;
 import cl.rutaexpress.shipments.exception.ShipmentNotFoundException;
-import cl.rutaexpress.shipments.messaging.*;
+import cl.rutaexpress.shipments.messaging.ShipmentCommandPublisher;
+import cl.rutaexpress.shipments.messaging.ShipmentEventPublisher;
 import cl.rutaexpress.shipments.repository.ShipmentRepository;
 import cl.rutaexpress.shipments.repository.ShipmentSpecifications;
 import org.springframework.data.domain.Page;
@@ -26,12 +27,12 @@ public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final CatalogClient catalogClient;
     private final ShipmentEventPublisher eventPublisher;
-    private final CommandPublisher commandPublisher;
+    private final ShipmentCommandPublisher commandPublisher;
 
     public ShipmentService(ShipmentRepository shipmentRepository,
                             CatalogClient catalogClient,
                             ShipmentEventPublisher eventPublisher,
-                            CommandPublisher commandPublisher) {
+                            ShipmentCommandPublisher commandPublisher) {
         this.shipmentRepository = shipmentRepository;
         this.catalogClient = catalogClient;
         this.eventPublisher = eventPublisher;
@@ -107,30 +108,14 @@ public class ShipmentService {
     }
 
     private void publishCommands(Shipment shipment, ShipmentStatus newStatus) {
-        Long id = shipment.getId();
         switch (newStatus) {
-            case ACEPTADO -> commandPublisher.publish("email.send", EventEnvelope.of(
-                    "EmailSendCommand", id.toString(),
-                    new EmailSendPayload(id, shipment.getRecipientEmail(), shipment.getRecipientName(),
-                            "ACEPTADO", "Tu envío ha sido aceptado")));
-            case EN_BODEGA -> commandPublisher.publish("warehouse.ticket", EventEnvelope.of(
-                    "WarehouseTicketCommand", id.toString(),
-                    new WarehouseTicketPayload(id, shipment.getOriginAddress(),
-                            shipment.getDestinationAddress(), shipment.getWeightKg())));
+            case ACEPTADO -> commandPublisher.notificarCliente(shipment, "ACEPTADO", "Tu envío ha sido aceptado");
+            case EN_BODEGA -> commandPublisher.solicitarTicketBodega(shipment);
             case EN_RUTA -> {
-                commandPublisher.publish("email.send", EventEnvelope.of(
-                        "EmailSendCommand", id.toString(),
-                        new EmailSendPayload(id, shipment.getRecipientEmail(), shipment.getRecipientName(),
-                                "EN_RUTA", "Tu envío está en ruta")));
-                commandPublisher.publish("label.gen", EventEnvelope.of(
-                        "LabelGenCommand", id.toString(),
-                        new LabelGenPayload(id, shipment.getRecipientName(), shipment.getDestinationAddress(),
-                                shipment.getWeightKg(), shipment.getServiceId())));
+                commandPublisher.notificarCliente(shipment, "EN_RUTA", "Tu envío está en ruta");
+                commandPublisher.solicitarEtiqueta(shipment);
             }
-            case ENTREGADO -> commandPublisher.publish("email.send", EventEnvelope.of(
-                    "EmailSendCommand", id.toString(),
-                    new EmailSendPayload(id, shipment.getRecipientEmail(), shipment.getRecipientName(),
-                            "ENTREGADO", "Tu envío ha sido entregado")));
+            case ENTREGADO -> commandPublisher.notificarCliente(shipment, "ENTREGADO", "Tu envío ha sido entregado");
             case CANCELADO -> {
                 // No RabbitMQ command for CANCELADO; Kafka event already published above.
             }

@@ -13,8 +13,7 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
   rabbitmq:
-    host: localhost
-    port: 5672
+    addresses: localhost:5672
 
 security:
   jwt:
