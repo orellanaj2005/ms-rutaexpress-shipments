@@ -7,10 +7,13 @@ import cl.rutaexpress.shipments.domain.ShipmentStatusTransitionValidator;
 import cl.rutaexpress.shipments.dto.CreateShipmentRequest;
 import cl.rutaexpress.shipments.exception.InvalidStatusTransitionException;
 import cl.rutaexpress.shipments.exception.ShipmentNotFoundException;
+import cl.rutaexpress.shipments.events.ShipmentCreatedEvent;
+import cl.rutaexpress.shipments.events.ShipmentStatusChangedEvent;
 import cl.rutaexpress.shipments.messaging.ShipmentCommandPublisher;
-import cl.rutaexpress.shipments.messaging.ShipmentEventPublisher;
 import cl.rutaexpress.shipments.repository.ShipmentRepository;
 import cl.rutaexpress.shipments.repository.ShipmentSpecifications;
+import cl.rutaexpress.shipments.security.CurrentUser;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,12 +32,12 @@ public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final CatalogClient catalogClient;
-    private final ShipmentEventPublisher eventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
     private final ShipmentCommandPublisher commandPublisher;
 
     public ShipmentService(ShipmentRepository shipmentRepository,
                             CatalogClient catalogClient,
-                            ShipmentEventPublisher eventPublisher,
+                            ApplicationEventPublisher eventPublisher,
                             ShipmentCommandPublisher commandPublisher) {
         this.shipmentRepository = shipmentRepository;
         this.catalogClient = catalogClient;
@@ -53,7 +57,13 @@ public class ShipmentService {
                 request.weightKg(),
                 request.declaredValue()
         );
-        return shipmentRepository.save(shipment);
+        Shipment saved = shipmentRepository.save(shipment);
+
+        // Se publica en Kafka recién después del commit (ShipmentKafkaEventsListener).
+        eventPublisher.publishEvent(new ShipmentCreatedEvent(saved.getId(), saved.getServiceId(),
+                saved.getStatus().name(), saved.getOriginAddress(), saved.getDestinationAddress(),
+                CurrentUser.fromSecurityContext(), UUID.randomUUID().toString(), saved.getCreatedAt()));
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -79,8 +89,10 @@ public class ShipmentService {
      * Transitions a shipment to a new status, applying the catalog capacity check
      * (for ACEPTADO), persisting the change, and publishing events/commands.
      * Steps run strictly in order: load -> validate transition -> catalog call
-     * (only if ACEPTADO) -> persist -> publish Kafka event -> publish RabbitMQ
-     * commands. Catalog/persistence failures abort before any status mutation.
+     * (only if ACEPTADO) -> persist -> publish RabbitMQ commands. The Kafka events
+     * (shipments.events and audit.timeline) are emitted after commit, so a
+     * rolled-back change never reaches Kafka. Catalog/persistence failures abort
+     * before any status mutation.
      */
     @Transactional
     public Shipment changeStatus(Long id, ShipmentStatus newStatus) {
@@ -107,7 +119,9 @@ public class ShipmentService {
         // publish any events, instead of being deferred to transaction commit.
         Shipment saved = shipmentRepository.saveAndFlush(shipment);
 
-        eventPublisher.publishStatusChanged(saved.getId(), previousStatus.name(), newStatus.name());
+        eventPublisher.publishEvent(new ShipmentStatusChangedEvent(saved.getId(), saved.getServiceId(),
+                previousStatus.name(), newStatus.name(), saved.getRecipientEmail(), saved.getRecipientName(),
+                CurrentUser.fromSecurityContext(), UUID.randomUUID().toString(), saved.getUpdatedAt()));
         publishCommands(saved, newStatus);
 
         return saved;
@@ -123,7 +137,7 @@ public class ShipmentService {
             }
             case ENTREGADO -> commandPublisher.notificarCliente(shipment, "ENTREGADO", "Tu envío ha sido entregado");
             case CANCELADO -> {
-                // No RabbitMQ command for CANCELADO; Kafka event already published above.
+                // No RabbitMQ command for CANCELADO; the Kafka event goes out after commit.
             }
             default -> {
                 // CREADO is never a transition target; no command to publish.

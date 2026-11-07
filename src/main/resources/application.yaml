@@ -20,9 +20,22 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Los serializadores (clave String, valor JSON del EventEnvelope) se fijan en KafkaProducerConfig.
     producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Confirmación solo cuando el mensaje está en todas las réplicas en sincronía (min.insync.replicas=2).
+      acks: all
+      # Reintentos ante fallas transitorias; con idempotencia no generan duplicados ni desorden.
+      retries: 10
+      compression-type: lz4
+      properties:
+        enable.idempotence: true
+        # Tope total para entregar un mensaje, reintentos incluidos (debe ser >= linger.ms + request.timeout.ms).
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+        # Espera breve para agrupar mensajes en un mismo lote.
+        linger.ms: 5
+        # Máximo que send() bloquea la hebra HTTP si el clúster no responde (por defecto son 60 s).
+        max.block.ms: 5000
 
   rabbitmq:
     # Lista de nodos del clúster: si el primero no responde, Spring se conecta al siguiente.
@@ -52,6 +65,7 @@ internal:
 messaging:
   kafka:
     topic-events: shipments.events
+    topic-audit: audit.timeline
 
 # Contrato de topología RabbitMQ: shipments solo publica, así que usa el exchange y las routing keys.
 rutaexpress:
