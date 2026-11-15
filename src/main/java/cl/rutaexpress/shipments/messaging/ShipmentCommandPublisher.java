@@ -55,26 +55,29 @@ public class ShipmentCommandPublisher {
 
     /** Correo al destinatario con el nuevo estado del envío. */
     public void notificarCliente(Shipment shipment, String event, String message) {
-        publish(emailRoutingKey, EventEnvelope.of("EmailSendCommand", shipment.getId().toString(),
+        // eventId fijo por envío y estado: notify genera el mismo comando desde Kafka y su dedup
+        // descarta el que llegue segundo (ver docs/eventos.md, sección 4).
+        publish(emailRoutingKey, CommandEnvelope.withEventId("EmailSendCommand",
+                CommandEnvelope.emailEventId(shipment.getId(), event), shipment.getId().toString(),
                 new EmailSendPayload(shipment.getId(), shipment.getRecipientEmail(), shipment.getRecipientName(),
                         event, message)));
     }
 
     /** Ticket de picking para la bodega. */
     public void solicitarTicketBodega(Shipment shipment) {
-        publish(warehouseRoutingKey, EventEnvelope.of("WarehouseTicketCommand", shipment.getId().toString(),
+        publish(warehouseRoutingKey, CommandEnvelope.of("WarehouseTicketCommand", shipment.getId().toString(),
                 new WarehouseTicketPayload(shipment.getId(), shipment.getOriginAddress(),
                         shipment.getDestinationAddress(), shipment.getWeightKg())));
     }
 
     /** Etiqueta de despacho en PDF. */
     public void solicitarEtiqueta(Shipment shipment) {
-        publish(labelRoutingKey, EventEnvelope.of("LabelGenCommand", shipment.getId().toString(),
+        publish(labelRoutingKey, CommandEnvelope.of("LabelGenCommand", shipment.getId().toString(),
                 new LabelGenPayload(shipment.getId(), shipment.getRecipientName(), shipment.getDestinationAddress(),
                         shipment.getWeightKg(), shipment.getServiceId())));
     }
 
-    private void publish(String routingKey, EventEnvelope<?> envelope) {
+    private void publish(String routingKey, CommandEnvelope<?> envelope) {
         try {
             String json = objectMapper.writeValueAsString(envelope);
             rabbitTemplate.convertAndSend(exchange, routingKey, json, new CorrelationData(envelope.eventId()));
